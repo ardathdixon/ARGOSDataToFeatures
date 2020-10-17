@@ -30,6 +30,9 @@ arcpy.AddField_management(outputFC,"TagID","LONG")
 arcpy.AddField_management(outputFC,"LC","TEXT")
 arcpy.AddField_management(outputFC,"Date","DATE")
 
+# Create an insert cursor
+cur = arcpy.da.InsertCursor(outputFC,['Shape@','TagID','LC','Date'])
+
 #%% Construct a while loop to iterate through all lines in the datafile
 # Open the ARGOS data file for reading
 inputFileObj = open(inputFile,'r')
@@ -61,12 +64,35 @@ while lineString:
         # Extract the date we need to variables
         obsLat = line2Data[2]
         obsLon= line2Data[5]
+   
+        try: 
+   
+            # Convert raw coordinate strings to numbers
+            if obsLat[-1] == 'N':
+                obsLat = float(obsLat[:-1])
+            else:
+                obsLat = float(obsLat[:-1]) * -1
+            if obsLon[-1] == 'E':
+                obsLon = float(obsLon[:-1])
+            else:
+                obsLon = float(obsLon[:-1]) * -1
+    
+            # Create a point object
+            obsPoint = arcpy.Point()
+            obsPoint.X = obsLon
+            obsPoint.Y = obsLat
+
+        except Exception as e:
+            print(f"Error adding record {tagID} to the output")
         
-        # Print results to see how we're doing
-        print (tagID,obsDate,obsTime,obsLC,"Lat:"+obsLat,"Long:"+obsLon)
+        # Add a feature using our insert cursor
+        feature = cur.insertRow((obsPoint,tagID,obsLC,obsDate.replace(".","/") + " " + obsTime))
         
     # Move to the next line so the while loop progresses
     lineString = inputFileObj.readline()
     
 #Close the file object
 inputFileObj.close()
+
+#Delete the cursor object
+del cur
